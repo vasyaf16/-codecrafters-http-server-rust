@@ -39,7 +39,7 @@ fn main() -> anyhow::Result<()>{
                         let res = echo
                             .split('/')
                             .skip(1)
-                            .map(|s|s.to_string())
+                            .map(|s|s.as_bytes())
                             .collect::<Vec<_>>();
                         let mut response = HTTP_200.to_vec();
                         response.extend(res);
