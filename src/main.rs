@@ -1,7 +1,7 @@
 // Uncomment this block to pass the first stage
 // use std::net::TcpListener;
 
-use std::io::Write;
+use std::io::{Read, Write};
 use std::net::TcpListener;
 
 fn main() -> anyhow::Result<()>{
@@ -17,8 +17,11 @@ fn main() -> anyhow::Result<()>{
             Ok(mut stream) => {
                 println!("accepted new connection");
                 let response = b"HTTP/1.1 200 OK\r\n\r\n";
+                let mut str = "".to_string();
+                stream.read_to_string(&mut str)?;
                 stream.write_all(response)?;
                 stream.flush()?;
+                println!("{str}");
             }
             Err(e) => {
                 println!("error: {}", e);
