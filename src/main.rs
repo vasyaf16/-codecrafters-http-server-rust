@@ -3,7 +3,6 @@
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::ptr::write;
 use anyhow::{anyhow};
 
 
@@ -34,8 +33,8 @@ fn main() -> anyhow::Result<()>{
         match stream {
             Ok(mut stream) => {
                 println!("accepted new connection");
-                match proceed_request(&mut stream)?.as_str() {
-                    "/" => write!(stream, "{:?}", HTTP_200)?,
+                let response = match proceed_request(&mut stream)?.as_str() {
+                    "/" => HTTP_200.to_vec(),
                     echo if echo.starts_with("/echo/") => {
                         let res = echo
                             .split('/')
@@ -44,14 +43,16 @@ fn main() -> anyhow::Result<()>{
                             .flatten()
                             .copied()
                             .collect::<Vec<_>>();
-                        write!(stream, "{:?}", HTTP_200)?;
-                        write!(stream, "Content-Type: text/plain \r\n")?;
-                        write!(stream, "Content-Length: {}", res.len())?;
-                        write!(stream, "{:?}", res)?;
+                        let mut response = HTTP_200.to_vec();
+                        response.extend(b"Content-Type: text/plain\r\n");
+                        response.extend((format!("Content-Length: {}\r\n", res.len())).as_bytes());
+                        response.extend(res);
+                        response
                     },
-                    _ =>  write!(stream, "{:?}", HTTP_404)?
+                    _ => HTTP_404.to_vec()
                 };
-                write!(stream, "\r\n")?;
+                stream.write_all(response.as_slice())?;
+                stream.write(b"\r\n")?;
                 stream.flush()?;
             }
             Err(e) => {
