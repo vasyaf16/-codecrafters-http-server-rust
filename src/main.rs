@@ -1,9 +1,10 @@
 // Uncomment this block to pass the first stage
 // use std::net::TcpListener;
 
-use std::io::{ErrorKind, Read, Write};
+use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use tokio::io::AsyncReadExt;
+use anyhow::Error;
+
 
 
 
@@ -15,8 +16,8 @@ fn proceed_request(stream: &mut TcpStream) -> anyhow::Result<&str> {
     let mut buf = [0; 2048];
     stream.read(&mut buf)?;
     let message = String::from_utf8_lossy(&buf);
-    let header = message.lines().next().ok_or(ErrorKind::InvalidInput)?;
-    let path = header.split_whitespace().nth(1).ok_or(ErrorKind::InvalidInput)?;
+    let header = message.lines().next().ok_or(Error::new("invalid header"))?;
+    let path = header.split_whitespace().nth(1).ok_or(Error::new("invalid path"))?;
     Ok(path)
 }
 
