@@ -3,7 +3,7 @@
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use anyhow::Error;
+use anyhow::{anyhow, Error};
 
 
 
@@ -16,8 +16,8 @@ fn proceed_request(stream: &mut TcpStream) -> anyhow::Result<&str> {
     let mut buf = [0; 2048];
     stream.read(&mut buf)?;
     let message = String::from_utf8_lossy(&buf);
-    let header = message.lines().next().ok_or(Error::new("invalid header"))?;
-    let path = header.split_whitespace().nth(1).ok_or(Error::new("invalid path"))?;
+    let header = message.lines().next().ok_or(anyhow!("invalid header"))?;
+    let path = header.split_whitespace().nth(1).ok_or(anyhow!("invalid path"))?;
     Ok(path)
 }
 
