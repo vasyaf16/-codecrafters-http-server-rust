@@ -3,7 +3,7 @@
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use anyhow::{anyhow, Error};
+use anyhow::{anyhow};
 
 
 
@@ -12,13 +12,13 @@ const HTTP_200: &[u8; 19] = b"HTTP/1.1 200 OK\r\n\r\n";
 const HTTP_404: &[u8; 26] = b"HTTP/1.1 404 NOT FOUND\r\n\r\n";
 
 
-fn proceed_request(stream: &mut TcpStream) -> anyhow::Result<&str> {
+fn proceed_request(stream: &mut TcpStream) -> anyhow::Result<String> {
     let mut buf = [0; 2048];
     stream.read(&mut buf)?;
     let message = String::from_utf8_lossy(&buf);
     let header = message.lines().next().ok_or(anyhow!("invalid header"))?;
     let path = header.split_whitespace().nth(1).ok_or(anyhow!("invalid path"))?;
-    Ok(path)
+    Ok(path.to_string())
 }
 
 fn main() -> anyhow::Result<()>{
@@ -34,7 +34,7 @@ fn main() -> anyhow::Result<()>{
             Ok(mut stream) => {
                 println!("accepted new connection");
                 let response = match proceed_request(&mut stream)? {
-                    "/" => HTTP_200.as_slice(),
+                    String::from("/") => HTTP_200.as_slice(),
                     _ => HTTP_404.as_slice()
                 };
                 stream.write_all(response)?;
