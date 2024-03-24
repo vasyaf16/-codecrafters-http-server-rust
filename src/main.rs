@@ -1,8 +1,24 @@
 // Uncomment this block to pass the first stage
 // use std::net::TcpListener;
 
-use std::io::{Read, Write};
-use std::net::TcpListener;
+use std::io::{ErrorKind, Read, Write};
+use std::net::{TcpListener, TcpStream};
+use tokio::io::AsyncReadExt;
+
+
+
+const HTTP_200: &[u8; 19] = b"HTTP/1.1 200 OK\r\n\r\n";
+const HTTP_404: &[u8; 26] = b"HTTP/1.1 404 NOT FOUND\r\n\r\n";
+
+
+fn proceed_request(stream: &mut TcpStream) -> anyhow::Result<&str> {
+    let mut buf = [0; 2048];
+    stream.read(&mut buf)?;
+    let message = String::from_utf8_lossy(&buf);
+    let header = message.lines().next().ok_or(ErrorKind::InvalidInput)?;
+    let path = header.split_whitespace().nth(1).ok_or(ErrorKind::InvalidInput)?;
+    Ok(path)
+}
 
 fn main() -> anyhow::Result<()>{
     // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -16,12 +32,12 @@ fn main() -> anyhow::Result<()>{
         match stream {
             Ok(mut stream) => {
                 println!("accepted new connection");
-                let response = b"HTTP/1.1 200 OK\r\n\r\n";
-                let mut str = "".to_string();
-                stream.read_to_string(&mut str)?;
+                let response = match proceed_request(&mut stream)? {
+                    "/" => HTTP_200.as_slice(),
+                    _ => HTTP_404.as_slice()
+                };
                 stream.write_all(response)?;
                 stream.flush()?;
-                println!("{str}");
             }
             Err(e) => {
                 println!("error: {}", e);
