@@ -3,13 +3,14 @@
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::ptr::write;
 use anyhow::{anyhow};
 
 
 
 
-const HTTP_200: &[u8; 19] = b"HTTP/1.1 200 OK\r\n\r\n";
-const HTTP_404: &[u8; 26] = b"HTTP/1.1 404 NOT FOUND\r\n\r\n";
+const HTTP_200: &[u8; 17] = b"HTTP/1.1 200 OK\r\n";
+const HTTP_404: &[u8; 24] = b"HTTP/1.1 404 NOT FOUND\r\n";
 
 
 fn proceed_request(stream: &mut TcpStream) -> anyhow::Result<String> {
@@ -33,23 +34,24 @@ fn main() -> anyhow::Result<()>{
         match stream {
             Ok(mut stream) => {
                 println!("accepted new connection");
-                let response = match proceed_request(&mut stream)?.as_str() {
-                    "/" => HTTP_200.to_vec(),
+                match proceed_request(&mut stream)?.as_str() {
+                    "/" => write!(stream, "{:?}", HTTP_200)?,
                     echo if echo.starts_with("/echo/") => {
                         let res = echo
                             .split('/')
-                            .skip(1)
+                            .skip(2)
                             .map(|s|s.as_bytes())
                             .flatten()
                             .copied()
                             .collect::<Vec<_>>();
-                        let mut response = HTTP_200.to_vec();
-                        response.extend(res);
-                        response
+                        write!(stream, "{:?}", HTTP_200)?;
+                        write!(stream, "Content-Type: text/plain \r\n")?;
+                        write!(stream, "Content-Length: {}", res.len())?;
+                        write!(stream, "{:?}", res)?;
                     },
-                    _ => HTTP_404.to_vec()
+                    _ =>  write!(stream, "{:?}", HTTP_404)?
                 };
-                stream.write_all(response.as_slice())?;
+                write!(stream, "\r\n")?;
                 stream.flush()?;
             }
             Err(e) => {
