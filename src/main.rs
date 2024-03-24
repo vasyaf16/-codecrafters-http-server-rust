@@ -34,7 +34,7 @@ fn main() -> anyhow::Result<()>{
             Ok(mut stream) => {
                 println!("{:?}",&stream);
                 println!("accepted new connection");
-                let mut response = match proceed_request(&mut stream)?.as_str() {
+                let response = match proceed_request(&mut stream)?.as_str() {
                     "/" => HTTP_200.to_vec(),
                     echo if echo.starts_with("/echo/") => {
                         let res = echo
@@ -46,13 +46,12 @@ fn main() -> anyhow::Result<()>{
                             .collect::<Vec<_>>();
                         let mut response = HTTP_200.to_vec();
                         response.extend(b"Content-Type: text/plain\r\n");
-                        response.extend((format!("Content-Length: {}\r\n", res.len())).as_bytes());
+                        response.extend((format!("Content-Length: {}\r\n\r\n", res.len())).as_bytes());
                         response.extend(res);
                         response
                     },
                     _ => HTTP_404.to_vec()
                 };
-                response.extend(b"\r\n");
                 stream.write_all(response.as_slice())?;
                 stream.flush()?;
             }
