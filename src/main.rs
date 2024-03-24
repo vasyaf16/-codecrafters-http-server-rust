@@ -34,10 +34,20 @@ fn main() -> anyhow::Result<()>{
             Ok(mut stream) => {
                 println!("accepted new connection");
                 let response = match proceed_request(&mut stream)?.as_str() {
-                    "/" => HTTP_200.as_slice(),
-                    _ => HTTP_404.as_slice()
+                    "/" => HTTP_200.to_vec(),
+                    echo if echo.starts_with("/echo/") => {
+                        let res = echo
+                            .split('/')
+                            .skip(1)
+                            .map(|s|s.to_string())
+                            .collect::<Vec<_>>();
+                        let mut response = HTTP_200.to_vec();
+                        response.extend(res);
+                        response
+                    },
+                    _ => HTTP_404.to_vec()
                 };
-                stream.write_all(response)?;
+                stream.write_all(response.as_slice())?;
                 stream.flush()?;
             }
             Err(e) => {
