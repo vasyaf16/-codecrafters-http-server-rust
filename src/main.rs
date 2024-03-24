@@ -40,9 +40,11 @@ fn main() -> anyhow::Result<()>{
                             .split('/')
                             .skip(1)
                             .map(|s|s.as_bytes())
+                            .flatten()
+                            .copied()
                             .collect::<Vec<_>>();
                         let mut response = HTTP_200.to_vec();
-                        response.extend(res.into_iter());
+                        response.extend(res);
                         response
                     },
                     _ => HTTP_404.to_vec()
