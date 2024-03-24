@@ -42,12 +42,11 @@ fn main() -> anyhow::Result<()>{
                     },
                     echo if echo.starts_with("/echo/") => {
                         let res = echo
-                            .split('/')
+                            .splitn(3, "/")
                             .skip(2)
-                            .map(|s|s.as_bytes())
-                            .flatten()
-                            .copied()
+                            .flat_map(|s| s.bytes())
                             .collect::<Vec<_>>();
+                        println!("{:?}", res);
                         let mut response = HTTP_200.to_vec();
                         response.extend(b"Content-Type: text/plain\r\n");
                         response.extend((format!("Content-Length: {}\r\n\r\n", res.len())).as_bytes());
