@@ -33,8 +33,8 @@ fn main() -> anyhow::Result<()>{
         match stream {
             Ok(mut stream) => {
                 println!("accepted new connection");
-                let response = match proceed_request(&mut stream)? {
-                    String::from("/") => HTTP_200.as_slice(),
+                let response = match proceed_request(&mut stream)?.as_str() {
+                    "/" => HTTP_200.as_slice(),
                     _ => HTTP_404.as_slice()
                 };
                 stream.write_all(response)?;
