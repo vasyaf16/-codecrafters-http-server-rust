@@ -42,7 +42,7 @@ fn main() -> anyhow::Result<()>{
                             .map(|s|s.as_bytes())
                             .collect::<Vec<_>>();
                         let mut response = HTTP_200.to_vec();
-                        response.extend(res);
+                        response.extend(res.into_iter());
                         response
                     },
                     _ => HTTP_404.to_vec()
