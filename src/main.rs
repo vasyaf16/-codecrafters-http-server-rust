@@ -3,6 +3,7 @@
 
 use std::io::{Write};
 use std::net::{TcpListener, TcpStream};
+use std::thread;
 use http_server_starter_rust::request::Request;
 
 
@@ -19,9 +20,13 @@ fn main() -> anyhow::Result<()>{
         match stream {
             Ok(mut stream) => {
                 println!("accepted new connection");
-                let res = Request::parse_request(&mut stream)?;
-                let response = res.get_response();
-                write!(stream, "{}", response)?;
+                thread::spawn(move || -> anyhow::Result<()> {
+                    let res = Request::parse_request(&mut stream)?;
+                    let response = res.get_response();
+                    write!(stream, "{}", response)?;
+                    Ok(())
+                });
+
             }
             Err(e) => {
                 println!("error: {}", e);
