@@ -1,6 +1,7 @@
 use std::fmt::{Formatter};
 use std::io::{BufRead, BufReader};
 use std::net::TcpStream;
+use std::sync::Arc;
 use anyhow::anyhow;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -8,6 +9,7 @@ pub enum Commands {
     Empty,
     Echo(String),
     UserAgent(String),
+    Directory(String),
     Unknown,
 }
 
@@ -31,7 +33,7 @@ pub struct Request {
 }
 
 impl Request {
-    pub fn parse_request(stream: &mut TcpStream) -> anyhow::Result<Self> {
+    pub fn parse_request(stream: &mut TcpStream, directory: Arc<String>) -> anyhow::Result<Self> {
         let mut buf = BufReader::new(stream);
         let mut path = String::new();
         buf.read_line(&mut path)?;
@@ -63,6 +65,19 @@ impl Request {
                         .expect("user agent should delimit with :");
                     assert_eq!(user_agent, "User-Agent");
                     Commands::UserAgent(content.trim_end().to_string())
+                },
+                file if file.starts_with("/files/") => {
+                    let filename = file
+                        .splitn(3, "/")
+                        .skip(2)
+                        .flat_map(|s| s.chars())
+                        .collect::<String>();
+                    let full_path = format!("{}/{}",directory, filename);
+                    let content = std::fs::read_to_string(full_path);
+                    match content {
+                        Ok(s) => Commands::Directory(s),
+                        Err(_) => Commands::Unknown,
+                    }
                 }
                 _ => Commands::Unknown
             };
@@ -112,7 +127,18 @@ impl Request {
                     status: HttpStatus::Ok,
                     content,
                 }
-            }
+            },
+            Commands::Directory(body) => {
+                let content = Some(Content {
+                    content_type: "application/octet-stream".to_string(),
+                    content_length: body.len(),
+                    body,
+                });
+                Response {
+                    status: HttpStatus::Ok,
+                    content,
+                }
+            },
             Commands::Unknown => {
                 Response {
                     status: HttpStatus::NotFound,
