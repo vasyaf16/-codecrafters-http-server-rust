@@ -2,7 +2,7 @@
 // use std::net::TcpListener;
 
 use std::io::{Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{TcpListener};
 use std::thread;
 use http_server_starter_rust::request::Request;
 use std::env::args;

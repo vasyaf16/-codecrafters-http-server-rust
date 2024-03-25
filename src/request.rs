@@ -1,8 +1,10 @@
 use std::fmt::{Formatter};
-use std::io::{BufRead, BufReader};
+use std::fs::File;
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
 use std::sync::Arc;
 use anyhow::anyhow;
+
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Commands {
@@ -40,7 +42,23 @@ impl Request {
         let mut host = String::new();
         buf.read_line(&mut host)?;
         let mut user_agent = String::new();
-        buf.read_line(&mut user_agent)?;
+        let mut content_length = 0u64;
+        loop {
+            let mut new_line = String::new();
+            buf.read_line(&mut new_line)?;
+            match new_line.trim() {
+                agent if agent.starts_with("User-Agent: ") => { user_agent = agent.to_string(); }
+                len if len.starts_with("Content-Length: ") => {
+                    let (tag, len) = len.split_once(": ").expect("content len should be viable");
+                    assert_eq!(tag, "Content-Length");
+                    let len = len.trim().parse::<u64>().expect("size should be a valid usize");
+                    content_length = len;
+                }
+                e if e.is_empty() => break,
+                _ => continue //don't care about anything else
+            }
+        }
+        let mut body = None;
         if let Some((method, rest)) = path.split_once(" ") {
             let method = match method {
                 "GET" => HttpMethod::GET,
@@ -65,18 +83,43 @@ impl Request {
                         .expect("user agent should delimit with :");
                     assert_eq!(user_agent, "User-Agent");
                     Commands::UserAgent(content.trim_end().to_string())
-                },
+                }
                 file if file.starts_with("/files/") => {
                     let filename = file
                         .splitn(3, "/")
                         .skip(2)
                         .flat_map(|s| s.chars())
                         .collect::<String>();
-                    let full_path = format!("{}/{}",directory, filename);
-                    let content = std::fs::read_to_string(full_path);
-                    match content {
-                        Ok(s) => Commands::Directory(s),
-                        Err(_) => Commands::Unknown,
+                    let full_path = format!("{}/{}", directory, filename);
+                    match method {
+                        HttpMethod::GET => {
+                            let content = std::fs::read_to_string(full_path);
+                            match content {
+                                Ok(s) => Commands::Directory(s),
+                                Err(_) => Commands::Unknown,
+                            }
+                        }
+                        HttpMethod::POST => {
+                            let mut content = vec![];
+                            let mut b = buf.take(content_length);
+                            let n = b.read_to_end(&mut content);
+                            match n {
+                                Ok(n) if n == content_length as usize => {
+                                    println!("i am here");
+                                    eprintln!("{}", &full_path);
+                                    let mut file = File::create(full_path)?;
+                                    file.write_all(&content)?;
+                                    file.flush()?;
+                                    body = Some(String::from_utf8(content)?);
+                                    Commands::Directory(String::new())
+                                },
+                                Ok(_) => {
+                                    println!("i am here 2");
+                                    Commands::Unknown},
+                                Err(_) => { println!("i am here 3");
+                                    Commands::Unknown}
+                            }
+                        }
                     }
                 }
                 _ => Commands::Unknown
@@ -91,7 +134,7 @@ impl Request {
             };
             return Ok(Self {
                 header,
-                body: None,
+                body,
             });
         } else {
             Err(anyhow!("invalid start line"))
@@ -128,6 +171,12 @@ impl Request {
                     content,
                 }
             },
+            Commands::Directory(_) if self.body.is_some() => {
+                Response {
+                    status: HttpStatus::Created,
+                    content: None
+                }
+            },
             Commands::Directory(body) => {
                 let content = Some(Content {
                     content_type: "application/octet-stream".to_string(),
@@ -139,6 +188,7 @@ impl Request {
                     content,
                 }
             },
+
             Commands::Unknown => {
                 Response {
                     status: HttpStatus::NotFound,
@@ -153,6 +203,7 @@ impl Request {
 pub enum HttpStatus {
     Ok = 200,
     NotFound = 404,
+    Created = 201,
 }
 
 impl std::fmt::Display for HttpStatus {
@@ -160,6 +211,7 @@ impl std::fmt::Display for HttpStatus {
         let output = match *self {
             HttpStatus::Ok => "HTTP/1.1 200 OK",
             HttpStatus::NotFound => "HTTP/1.1 404 NOT FOUND",
+            HttpStatus::Created => "HTTP/1.1 201 CREATED",
         };
         write!(f, "{}", output)
     }
@@ -189,7 +241,6 @@ impl std::fmt::Display for Response {
                        content.content_type,
                        content.content_length,
                        content.body
-
                 )
             }
         }
